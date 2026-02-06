@@ -19,5 +19,11 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run script
+      - name: Run DPS script
         run: python main.py
+
+      - name: Run Heal script
+        run: python heal.py
+
+      - name: Run Tank script
+        run: python tank.py
