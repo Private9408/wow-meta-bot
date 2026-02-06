@@ -4,45 +4,68 @@ import os
 
 # Configuration
 URL_NEWS = "https://www.leagueoflegends.com/fr-fr/news/game-updates/"
-WEBHOOK_URL = os.getenv("https://discord.com/api/webhooks/1469458508977279079/YL4KeSwJKfv9OtnkTk9traXj8itFPxpBNb8ZO-4TMkfneO1HjYBL3_rZ9tHZnOzk-XFO")
+# Cette ligne récupère l'URL que tu as mise dans "Secrets" sur GitHub
+WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK")
 
 def get_latest_patch():
-    response = requests.get(URL_NEWS)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # On cherche le premier lien qui contient "Notes de patch"
-    for link in soup.find_all('a'):
-        title_element = link.find('h2')
-        if title_element and "Notes de patch" in title_element.text:
-            title = title_element.text
-            url = "https://www.leagueoflegends.com" + link['href']
-            image = link.find('img')['src'] if link.find('img') else ""
-            return title, url, image
+    # Header pour simuler un navigateur et éviter d'être bloqué
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    try:
+        response = requests.get(URL_NEWS, headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # On cherche le premier lien qui parle de "Notes de patch"
+        for link in soup.find_all('a'):
+            title_element = link.find('h2')
+            if title_element and "Notes de patch" in title_element.text:
+                title = title_element.text.strip()
+                href = link.get('href', '')
+                # Reconstruit l'URL si elle est relative
+                url = href if href.startswith('http') else "https://www.leagueoflegends.com" + href
+                
+                # Cherche l'image du patch
+                img_tag = link.find('img')
+                image = img_tag['src'] if img_tag and img_tag.has_attr('src') else ""
+                
+                return title, url, image
+    except Exception as e:
+        print(f"Erreur lors du scan : {e}")
     return None, None, None
 
 title, url, image = get_latest_patch()
 
-if title:
-    # On vérifie si ce patch a déjà été posté (via un fichier local de cache)
+if title and url:
     cache_file = "last_patch.txt"
     last_sent = ""
+    
+    # Lecture du dernier patch envoyé
     if os.path.exists(cache_file):
         with open(cache_file, "r") as f:
             last_sent = f.read().strip()
 
+    # Si c'est un nouveau patch, on l'envoie
     if url != last_sent:
-        # Envoi à Discord
         payload = {
+            "content": "📢 **Nouveau patch disponible sur League of Legends !**",
             "embeds": [{
                 "title": title,
                 "url": url,
-                "color": 16743424, # Orange League
-                "image": {"url": image},
-                "description": f"Le nouveau patch est disponible !\n[Lire les notes ici]({url})"
+                "color": 16743424,
+                "image": {"url": image} if image else None,
+                "description": f"Les notes du dernier patch sont en ligne.\n[Consulter les modifications ici]({url})"
             }]
         }
-        requests.post(WEBHOOK_URL, json=payload)
         
-        # Mise à jour du cache
-        with open(cache_file, "w") as f:
-            f.write(url)
+        r = requests.post(WEBHOOK_URL, json=payload)
+        
+        if r.status_code == 204 or r.status_code == 200:
+            # On enregistre l'URL pour ne pas renvoyer le même patch
+            with open(cache_file, "w") as f:
+                f.write(url)
+            print(f"Patch envoyé : {title}")
+        else:
+            print(f"Erreur Discord : {r.status_code}")
+    else:
+        print("Pas de nouveau patch détecté.")
+else:
+    print("Impossible de trouver le patch sur la page.")
