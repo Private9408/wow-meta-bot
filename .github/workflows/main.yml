@@ -1,45 +1,29 @@
-name: Bot WoW et LoL
+name: WoW Meta Update
 on:
   schedule:
-    - cron: '0 * * * *' # Tourne toutes les heures
-  workflow_dispatch: # Permet de le lancer manuellement
+    - cron: '0 9 * * *'
+  workflow_dispatch:
 
 jobs:
-  run_bots:
+  run-bot:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Autorise GitHub à enregistrer last_patch.txt
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Configuration Python
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
-          
-      - name: Installation des dépendances
-        run: pip install requests beautifulsoup4
-        
-      - name: Lancement WoW
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run DPS script
         run: python main.py
-        
-      - name: Lancement LoL
-        run: python check_patch.py
-        
-      - name: Sauvegarde Automatique
-        run: |
-          git config --local user.name 'github-actions[bot]'
-          git config --local user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          # Force la création du fichier s'il a disparu
-          touch last_patch.txt
-          
-          git add last_patch.txt
-          
-          # Ne commit que s'il y a un changement (nouveau patch détecté)
-          if git diff --staged --quiet; then
-            echo "Rien de nouveau à sauvegarder."
-          else
-            git commit -m "Mise à jour du cache (Nouveau Patch)"
-            git push
-          fi
+
+      - name: Run Heal script
+        run: python heal.py
+
+      - name: Run Tank script
+        run: python tank.py
