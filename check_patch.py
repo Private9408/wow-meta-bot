@@ -1,68 +1,111 @@
 import requests
+import datetime
 
-# --- CONFIGURATION MANUELLE DU PATCH ---
-# Change ces informations à chaque nouveau patch
+# ==============================================================================
+# 🎛️ ZONE DE CONFIGURATION (MODIFIE ICI À CHAQUE PATCH)
+# ==============================================================================
+
+# 1. Numéro du Patch
 VERSION = "26.3"
-PATCH_URL = f"https://www.leagueoflegends.com/fr-fr/news/game-updates/patch-{VERSION.replace('.', '-')}-notes/"
 
-# Résumé rapide des changements (À modifier à chaque patch)
-BUFFS = "Aatrox, Cho'Gath, Corki, Lux"
-NERFS = "Ezreal, Karma, Maokai"
-SKINS = "Porcelaine (Kindred, Graves, Darius)"
-NOTE_CLE = "Ajustements majeurs sur les objets de support et équilibrage de l'ARAM."
+# 2. Lien officiel (Généré auto, mais tu peux le changer si besoin)
+URL_PATCH = f"https://www.leagueoflegends.com/fr-fr/news/game-updates/patch-{VERSION.replace('.', '-')}-notes/"
 
-# URL de l'image de garde (Bannière du patch)
-PATCH_IMAGE = "https://images.contentstack.io/v3/assets/blt731b4148e173d051/blt7e727e57c6179471/65b056801289133c99f9c733/013124_LoL_Patch_26_3_Notes_Banner.jpg"
+# 3. Image de la bannière (Celle que tu vois en haut de la page du patch)
+IMAGE_BANNIERE = "https://images.contentstack.io/v3/assets/blt731b4148e173d051/blt7e727e57c6179471/65b056801289133c99f9c733/013124_LoL_Patch_26_3_Notes_Banner.jpg"
 
-# Ton URL Webhook LoL
+# 4. Résumé des changements (Utilise les émojis pour le style)
+# Astuce : Mets en GRAS (**nom**) les champions importants
+BUFFS_LISTE = (
+    "🚀 **Zeri** (Dégâts Q augmentés)\n"
+    "🛡️ **Braum** (Coût en mana réduit)\n"
+    "🌲 **Ivern** (Vitesse de clear)\n"
+    "👻 **Viego** (Portée du R)"
+)
+
+NERFS_LISTE = (
+    "🔥 **Brand** (Dégâts passif réduits)\n"
+    "🗡️ **Aatrox** (Soin nerfé)\n"
+    "🔫 **Caitlyn** (Ratio AD Headshot)"
+)
+
+AJUSTEMENTS_LISTE = (
+    "⚖️ **Objets Supports** : Quêtes plus longues\n"
+    "🐉 **Dragon Chemtech** : Soul buffée\n"
+    "🐛 **Larves du Néant** : Spawn retardé de 30s"
+)
+
+SKINS_LISTE = "✨ **Porcelaine** : Kindred, Darius, Graves, Morgana\n🌙 **Lune de Sang** : Zyra, Yorick"
+
+# 5. Phrase d'accroche
+PHRASE_ACCROCHE = "Invocateurs, la méta change ! Voici tout ce qu'il faut savoir avant de lancer votre prochaine Ranked."
+
+# ==============================================================================
+# 🤖 CODE DU BOT (NE TOUCHE PAS EN DESSOUS)
+# ==============================================================================
+
 WEBHOOK_URL = "https://discord.com/api/webhooks/1469458508977279079/YL4KeSwJKfv9OtnkTk9traXj8itFPxpBNb8ZO-4TMkfneO1HjYBL3_rZ9tHZnOzk-XFO"
 
-def send_detailed_patch():
+def send_ultimate_patch():
+    # Création de l'embed
     embed = {
-        "title": f"🛠️ NOTES DE PATCH {VERSION}",
-        "url": PATCH_URL,
-        "color": 16743424, # Orange League of Legends
-        "description": f"La mise à jour **{VERSION}** est arrivée ! Voici un résumé des changements importants sur la Faille.",
+        "title": f"📜 NOTES DE PATCH {VERSION} | LEAGUE OF LEGENDS",
+        "description": f"*{PHRASE_ACCROCHE}*\n\n[**👉 CLIQUER ICI POUR LIRE LE PATCH COMPLET**]({URL_PATCH})",
+        "url": URL_PATCH,
+        "color": 0xC8AA6E, # Couleur "Hextech Gold" officielle
         "fields": [
             {
-                "name": "📈 Buffs (Champions & Items)",
-                "value": BUFFS,
+                "name": "📈 UP (BUFFS)",
+                "value": BUFFS_LISTE,
                 "inline": True
             },
             {
-                "name": "📉 Nerfs (Champions & Items)",
-                "value": NERFS,
+                "name": "📉 DOWN (NERFS)",
+                "value": NERFS_LISTE,
                 "inline": True
             },
             {
-                "name": "🎨 Nouveaux Skins",
-                "value": SKINS,
-                "inline": False
+                "name": "\u200b", # Séparateur invisible
+                "value": "\u200b",
+                "inline": False 
             },
             {
-                "name": "📝 Note importante",
-                "value": NOTE_CLE,
-                "inline": False
+                "name": "🛠️ SYSTÈME & JUNGLE",
+                "value": AJUSTEMENTS_LISTE,
+                "inline": True
+            },
+            {
+                "name": "🎨 NOUVEAUX SKINS",
+                "value": SKINS_LISTE,
+                "inline": True
             }
         ],
-        "image": {"url": PATCH_IMAGE},
+        "image": {
+            "url": IMAGE_BANNIERE
+        },
+        "thumbnail": {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/League_of_Legends_2019_vector.svg/1200px-League_of_Legends_2019_vector.svg.png"
+        },
         "footer": {
-            "text": "Bot League Update • Cliquez sur le titre pour les détails complets",
-            "icon_url": "https://p3.stickers.cloud/packs/3673e48c-12f5-460d-9993-41c60f27c385/webp/7243b95a-9390-4841-8f5b-5544d6731998.webp"
-        }
+            "text": f"Mise à jour officielle • Patch {VERSION} • Riot Games",
+            "icon_url": "https://brand.riotgames.com/static/a91000434ed683358004b85c95d43ce0/8a26a/riot-logo.png"
+        },
+        "timestamp": datetime.datetime.now().isoformat()
     }
 
+    # Structure du message
     payload = {
-        "content": "🔔 **Une nouvelle mise à jour est disponible !**",
+        "content": f"# 📣 MISE À JOUR {VERSION} DISPONIBLE !\n@everyone Préparez vos champions !",
         "embeds": [embed]
     }
 
-    response = requests.post(WEBHOOK_URL, json=payload)
-    
-    if response.status_code in [200, 204]:
-        print(f"Patch {VERSION} envoyé avec succès !")
-    else:
-        print(f"Erreur : {response.status_code} - {response.text}")
+    # Envoi
+    try:
+        response = requests.post(WEBHOOK_URL, json=payload)
+        response.raise_for_status()
+        print(f"✅ Patch {VERSION} envoyé avec succès (Status: {response.status_code})")
+    except Exception as e:
+        print(f"❌ Erreur lors de l'envoi : {e}")
 
 if __name__ == "__main__":
-    send_detailed_patch()
+    send_ultimate_patch()
