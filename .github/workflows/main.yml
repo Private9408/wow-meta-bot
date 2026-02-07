@@ -1,28 +1,20 @@
 name: Check LoL Patch
 on:
-  schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # Se lance uniquement quand tu cliques sur "Run workflow"
 
 jobs:
-  check:
+  send_patch:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python
+      
+      - name: Configuration Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Install dependencies
-        run: pip install requests beautifulsoup4
-      - name: Run LoL script
+          
+      - name: Installation des dépendances
+        run: pip install requests
+        
+      - name: Envoi du Patch sur Discord
         run: python check_patch.py
-      - name: Update cache
-        run: |
-          git config --global user.name 'PatchBot'
-          git config --global user.email 'bot@github.com'
-          git add last_patch.txt
-          git commit -m "Update last patch" || exit 0
-          git push
