@@ -1,29 +1,28 @@
-name: WoW Meta Update
+name: Check LoL Patch
 on:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v3
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
       - name: Install dependencies
-        run: pip install requests
-
-      - name: Run DPS script
-        run: python main.py
-
-      - name: Run Heal script
-        run: python heal.py
-
-      - name: Run Tank script
-        run: python tank.py
+        run: pip install requests beautifulsoup4
+      - name: Run LoL script
+        run: python check_patch.py
+      - name: Update cache
+        run: |
+          git config --global user.name 'PatchBot'
+          git config --global user.email 'bot@github.com'
+          git add last_patch.txt
+          git commit -m "Update last patch" || exit 0
+          git push
