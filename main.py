@@ -1,62 +1,143 @@
 import requests
+from playwright.sync_api import sync_playwright
 
-# Ton URL de Webhook Discord
 WEBHOOK_URL = "https://discord.com/api/webhooks/1469383829041975380/51UI7h8gILbV51o6AreYyRZTxeH3IjQ97KAGDlxKc7-qOLY3YHik0R-HCdskCoFCKIdm"
 
+CLASSES = {
+    "HUNTER":       {"icon": "🏹", "color": 0xABD473},
+    "WARRIOR":      {"icon": "⚔️", "color": 0xC79C6E},
+    "DEATH KNIGHT": {"icon": "💀", "color": 0xC41F3B},
+    "MAGE":         {"icon": "❄️", "color": 0x3FC7EB},
+    "DEMON HUNTER": {"icon": "😈", "color": 0xA330C9},
+    "WARLOCK":      {"icon": "🔮", "color": 0x8787ED},
+    "SHAMAN":       {"icon": "⚡", "color": 0x0070DE},
+    "PALADIN":      {"icon": "🔨", "color": 0xF58CBA},
+    "DRUID":        {"icon": "🌿", "color": 0xFF7D0A},
+    "PRIEST":       {"icon": "✨", "color": 0xFFFFFF},
+    "ROGUE":        {"icon": "🗡️", "color": 0xFFF569},
+    "MONK":         {"icon": "🤜", "color": 0x00FF96},
+    "EVOKER":       {"icon": "🐲", "color": 0x33937F}
+}
+
+# Correspondance texte du site → clé dans CLASSES
+CLASS_MAP = {
+    "death knight":  "DEATH KNIGHT",
+    "demon hunter":  "DEMON HUNTER",
+    "hunter":        "HUNTER",
+    "warrior":       "WARRIOR",
+    "mage":          "MAGE",
+    "warlock":       "WARLOCK",
+    "shaman":        "SHAMAN",
+    "paladin":       "PALADIN",
+    "druid":         "DRUID",
+    "priest":        "PRIEST",
+    "rogue":         "ROGUE",
+    "monk":          "MONK",
+    "evoker":        "EVOKER"
+}
+
+def scrape_murlok():
+    """Scrape le Top 5 DPS M+ directement depuis murlok.io"""
+    top_dps = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        print("📡 Chargement de murlok.io...")
+        page.goto("https://murlok.io/meta/dps/m+", wait_until="networkidle", timeout=30000)
+
+        # Attendre que les rankings soient chargés
+        page.wait_for_selector("a[href*='/m+']", timeout=15000)
+
+        # Récupérer les éléments du classement
+        items = page.query_selector_all("a[href*='/m+']")
+
+        rank = 1
+        for item in items:
+            if rank > 5:
+                break
+
+            text = item.inner_text().strip()
+            lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+            # On cherche une ligne avec un score (nombre 4 chiffres)
+            score = None
+            name_parts = []
+            for line in lines:
+                if line.isdigit() and len(line) == 4:
+                    score = line
+                elif not line.isdigit():
+                    name_parts.append(line)
+
+            if not score:
+                continue
+
+            # Le nom complet ex: "Unholy Death Knight"
+            full_name = " ".join(name_parts).replace(str(rank), "").strip()
+            full_name_lower = full_name.lower()
+
+            # Trouver la classe
+            found_class = None
+            found_spec = None
+            for class_key in sorted(CLASS_MAP.keys(), key=len, reverse=True):
+                if class_key in full_name_lower:
+                    found_class = CLASS_MAP[class_key]
+                    found_spec = full_name_lower.replace(class_key, "").strip().upper()
+                    break
+
+            if found_class and found_spec:
+                top_dps.append({
+                    "rank": str(rank),
+                    "spec": found_spec,
+                    "class": found_class,
+                    "score": score
+                })
+                rank += 1
+
+        browser.close()
+
+    return top_dps
+
+
 def send_meta():
-    # Dictionnaire de toutes les classes avec icônes et couleurs
-    CLASSES = {
-        "HUNTER": {"icon": "🏹", "color": 0xABD473},
-        "WARRIOR": {"icon": "⚔️", "color": 0xC79C6E},
-        "DEATH KNIGHT": {"icon": "💀", "color": 0xC41F3B},
-        "MAGE": {"icon": "❄️", "color": 0x3FC7EB},
-        "DEMON HUNTER": {"icon": "😈", "color": 0xA330C9},
-        "WARLOCK": {"icon": "🔮", "color": 0x8787ED},
-        "SHAMAN": {"icon": "⚡", "color": 0x0070DE},
-        "PALADIN": {"icon": "🔨", "color": 0xF58CBA},
-        "DRUID": {"icon": "🌿", "color": 0xFF7D0A},
-        "PRIEST": {"icon": "✨", "color": 0xFFFFFF},
-        "ROGUE": {"icon": "🗡️", "color": 0xFFF569},
-        "MONK": {"icon": "🤜", "color": 0x00FF96},
-        "EVOKER": {"icon": "🐲", "color": 0x33937F}
-    }
+    print("🔍 Scraping des données Murlok.io...")
+    top_dps = scrape_murlok()
 
-    # Liste du Top DPS (Modifie les noms et scores ici quand ça change sur Murlok)
-    top_dps = [
-        {"rank": "1", "spec": "SURVIVAL", "class": "HUNTER", "score": "4127"},
-        {"rank": "2", "spec": "FURY", "class": "WARRIOR", "score": "4124"},
-        {"rank": "3", "spec": "UNHOLY", "class": "DEATH KNIGHT", "score": "4118"},
-        {"rank": "4", "spec": "FROST", "class": "MAGE", "score": "4111"},
-        {"rank": "5", "spec": "DEVOURER", "class": "DEMON HUNTER", "score": "4092"}
-    ]
+    if not top_dps:
+        print("❌ Aucune donnée récupérée !")
+        return
 
-    # Récupération de la couleur de la classe n°1 pour le bord du message
+    print(f"✅ {len(top_dps)} specs récupérées")
+
     first_class = top_dps[0]["class"]
     embed_color = CLASSES[first_class]["color"]
+
+    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
 
     embed = {
         "title": "🏆 TOP 5 DPS M+ - MURLOK.IO",
         "color": embed_color,
-        "description": "Classements actuels pour World of Warcraft: Midnight",
+        "description": "Classements **en temps réel** pour WoW: Midnight\n🔗 [Voir sur Murlok.io](https://murlok.io/meta/dps/m+)",
         "fields": [],
-        "footer": {"text": "Actualisé via GitHub Actions • Midnight 12.0"}
+        "footer": {"text": "Données live • Murlok se met à jour toutes les 8h • Midnight 12.0"}
     }
 
-    for item in top_dps:
+    for i, item in enumerate(top_dps):
         c_info = CLASSES[item["class"]]
         embed["fields"].append({
-            "name": f"{item['rank']}. {c_info['icon']} {item['spec']} {item['class']}",
+            "name": f"{medals[i]} {c_info['icon']} {item['spec']} {item['class']}",
             "value": f"📈 Score : `{item['score']}`",
             "inline": False
         })
 
-    # Envoi au Discord
     response = requests.post(WEBHOOK_URL, json={"embeds": [embed]})
-    
+
     if response.status_code == 204:
-        print("Message envoyé avec succès !")
+        print("✅ Message Discord envoyé avec succès !")
     else:
-        print(f"Erreur : {response.status_code}")
+        print(f"❌ Erreur Discord : {response.status_code} - {response.text}")
+
 
 if __name__ == "__main__":
     send_meta()
