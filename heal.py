@@ -1,50 +1,142 @@
 import requests
+from playwright.sync_api import sync_playwright
 
-# Ton URL de Webhook Discord
-WEBHOOK_URL = "https://discord.com/api/webhooks/1469392325775069266/sIVDwFyieKtZcGGSS7asyCHv5pIzcsur9dy_i5-GfanQkFtVSHcYHlmo_28_m5G59voC"
+WEBHOOK_URL = "https://discord.com/api/webhooks/1469383829041975380/51UI7h8gILbV51o6AreYyRZTxeH3IjQ97KAGDlxKc7-qOLY3YHik0R-HCdskCoFCKIdm"
 
-def send_heal_meta():
-    # Dictionnaire de TOUTES les classes Heal (au cas où le top change)
-    CLASSES = {
-        "SHAMAN": {"icon": "🌊", "color": 0x0070DE},   # Restauration
-        "EVOKER": {"icon": "🐲", "color": 0x33937F},   # Préservation
-        "PRIEST": {"icon": "✨", "color": 0xFFFFFF},   # Discipline / Sacré
-        "DRUID": {"icon": "🌿", "color": 0xFF7D0A},    # Restauration
-        "MONK": {"icon": "🍃", "color": 0x00FF96},     # Tisse-brume
-        "PALADIN": {"icon": "🔨", "color": 0xF58CBA}   # Sacré
-    }
+CLASSES = {
+    "HUNTER":       {"icon": "🏹", "color": 0xABD473},
+    "WARRIOR":      {"icon": "⚔️", "color": 0xC79C6E},
+    "DEATH KNIGHT": {"icon": "💀", "color": 0xC41F3B},
+    "MAGE":         {"icon": "❄️", "color": 0x3FC7EB},
+    "DEMON HUNTER": {"icon": "😈", "color": 0xA330C9},
+    "WARLOCK":      {"icon": "🔮", "color": 0x8787ED},
+    "SHAMAN":       {"icon": "⚡", "color": 0x0070DE},
+    "PALADIN":      {"icon": "🔨", "color": 0xF58CBA},
+    "DRUID":        {"icon": "🌿", "color": 0xFF7D0A},
+    "PRIEST":       {"icon": "✨", "color": 0xFFFFFF},
+    "ROGUE":        {"icon": "🗡️", "color": 0xFFF569},
+    "MONK":         {"icon": "🤜", "color": 0x00FF96},
+    "EVOKER":       {"icon": "🐲", "color": 0x33937F}
+}
 
-    # Top 5 Heal actuel (Modifie ici selon Murlok.io)
-    top_heal = [
-        {"rank": "1", "spec": "RESTORATION", "class": "SHAMAN", "score": "4205"},
-        {"rank": "2", "spec": "PRESERVATION", "class": "EVOKER", "score": "4188"},
-        {"rank": "3", "spec": "DISCIPLINE", "class": "PRIEST", "score": "4150"},
-        {"rank": "4", "spec": "RESTORATION", "class": "DRUID", "score": "4110"},
-        {"rank": "5", "spec": "MISTWEAVER", "class": "MONK", "score": "4095"}
-    ]
+CLASS_MAP = {
+    "death knight":  "DEATH KNIGHT",
+    "demon hunter":  "DEMON HUNTER",
+    "hunter":        "HUNTER",
+    "warrior":       "WARRIOR",
+    "mage":          "MAGE",
+    "warlock":       "WARLOCK",
+    "shaman":        "SHAMAN",
+    "paladin":       "PALADIN",
+    "druid":         "DRUID",
+    "priest":        "PRIEST",
+    "rogue":         "ROGUE",
+    "monk":          "MONK",
+    "evoker":        "EVOKER"
+}
 
-    # Couleur dynamique basée sur le n°1
-    first_class_color = CLASSES[top_heal[0]["class"]]["color"]
+def scrape_murlok_heal():
+    top_heal = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        print("📡 Chargement de murlok.io (Healer)...")
+
+        page.goto("https://murlok.io/meta/healer/m+", wait_until="domcontentloaded", timeout=60000)
+
+        try:
+            page.wait_for_selector("a[href*='/m+']", timeout=30000)
+        except:
+            print("⚠️ Sélecteur pas trouvé, on essaie quand même...")
+
+        page.wait_for_timeout(5000)
+
+        items = page.query_selector_all("a[href*='/m+']")
+
+        rank = 1
+        for item in items:
+            if rank > 5:
+                break
+
+            text = item.inner_text().strip()
+            lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+            score = None
+            name_parts = []
+            for line in lines:
+                if line.isdigit() and len(line) == 4:
+                    score = line
+                elif not line.isdigit():
+                    name_parts.append(line)
+
+            if not score:
+                continue
+
+            full_name = " ".join(name_parts).replace(str(rank), "").strip()
+            full_name_lower = full_name.lower()
+
+            found_class = None
+            found_spec = None
+            for class_key in sorted(CLASS_MAP.keys(), key=len, reverse=True):
+                if class_key in full_name_lower:
+                    found_class = CLASS_MAP[class_key]
+                    found_spec = full_name_lower.replace(class_key, "").strip().upper()
+                    break
+
+            if found_class and found_spec:
+                top_heal.append({
+                    "rank": str(rank),
+                    "spec": found_spec,
+                    "class": found_class,
+                    "score": score
+                })
+                rank += 1
+
+        browser.close()
+
+    return top_heal
+
+
+def send_heal():
+    print("🔍 Scraping des données Healer Murlok.io...")
+    top_heal = scrape_murlok_heal()
+
+    if not top_heal:
+        print("❌ Aucune donnée récupérée !")
+        return
+
+    print(f"✅ {len(top_heal)} specs récupérées")
+
+    first_class = top_heal[0]["class"]
+    embed_color = CLASSES[first_class]["color"]
+
+    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
 
     embed = {
-        "title": "🌿 TOP 5 HEALERS M+ - MURLOK.IO",
-        "color": first_class_color,
-        "description": "Classement des soigneurs (Top 50 mondial)",
+        "title": "💚 TOP 5 HEALERS M+ - MURLOK.IO",
+        "color": embed_color,
+        "description": "Classements **en temps réel** pour WoW: Midnight\n🔗 [Voir sur Murlok.io](https://murlok.io/meta/healer/m+)",
         "fields": [],
-        "footer": {"text": "Mis à jour via GitHub Actions • Midnight"}
+        "footer": {"text": "Données live • Murlok se met à jour toutes les 8h • Midnight 12.0"}
     }
 
-    for item in top_heal:
-        # On récupère les infos de la classe (icône/couleur)
-        c_info = CLASSES.get(item["class"], {"icon": "🏥", "color": 0x2f3136})
-        
+    for i, item in enumerate(top_heal):
+        c_info = CLASSES[item["class"]]
         embed["fields"].append({
-            "name": f"{item['rank']}. {c_info['icon']} {item['spec']} {item['class']}",
-            "value": f"💚 Score : `{item['score']}`",
+            "name": f"{medals[i]} {c_info['icon']} {item['spec']} {item['class']}",
+            "value": f"📈 Score : `{item['score']}`",
             "inline": False
         })
 
-    requests.post(WEBHOOK_URL, json={"embeds": [embed]})
+    response = requests.post(WEBHOOK_URL, json={"embeds": [embed]})
+
+    if response.status_code == 204:
+        print("✅ Message Discord envoyé avec succès !")
+    else:
+        print(f"❌ Erreur Discord : {response.status_code} - {response.text}")
+
 
 if __name__ == "__main__":
-    send_heal_meta()
+    send_heal()
