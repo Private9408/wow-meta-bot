@@ -24,5 +24,11 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
 
-      - name: Lancer le bot
+      - name: Lancer DPS Bot
         run: python main.py
+
+      - name: Lancer Healer Bot
+        run: python heal.py
+
+      - name: Lancer Tank Bot
+        run: python tank.py
