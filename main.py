@@ -19,7 +19,6 @@ CLASSES = {
     "EVOKER":       {"icon": "🐲", "color": 0x33937F}
 }
 
-# Correspondance texte du site → clé dans CLASSES
 CLASS_MAP = {
     "death knight":  "DEATH KNIGHT",
     "demon hunter":  "DEMON HUNTER",
@@ -37,7 +36,6 @@ CLASS_MAP = {
 }
 
 def scrape_murlok():
-    """Scrape le Top 5 DPS M+ directement depuis murlok.io"""
     top_dps = []
 
     with sync_playwright() as p:
@@ -45,12 +43,19 @@ def scrape_murlok():
         page = browser.new_page()
 
         print("📡 Chargement de murlok.io...")
-        page.goto("https://murlok.io/meta/dps/m+", wait_until="networkidle", timeout=30000)
 
-        # Attendre que les rankings soient chargés
-        page.wait_for_selector("a[href*='/m+']", timeout=15000)
+        # ✅ FIX : domcontentloaded au lieu de networkidle + timeout 60s
+        page.goto("https://murlok.io/meta/dps/m+", wait_until="domcontentloaded", timeout=60000)
 
-        # Récupérer les éléments du classement
+        # ✅ FIX : Attente du sélecteur avec 30s
+        try:
+            page.wait_for_selector("a[href*='/m+']", timeout=30000)
+        except:
+            print("⚠️ Sélecteur pas trouvé, on essaie quand même...")
+
+        # ✅ FIX : Pause 5s pour laisser le JavaScript finir de charger
+        page.wait_for_timeout(5000)
+
         items = page.query_selector_all("a[href*='/m+']")
 
         rank = 1
@@ -61,7 +66,6 @@ def scrape_murlok():
             text = item.inner_text().strip()
             lines = [l.strip() for l in text.split("\n") if l.strip()]
 
-            # On cherche une ligne avec un score (nombre 4 chiffres)
             score = None
             name_parts = []
             for line in lines:
@@ -73,11 +77,9 @@ def scrape_murlok():
             if not score:
                 continue
 
-            # Le nom complet ex: "Unholy Death Knight"
             full_name = " ".join(name_parts).replace(str(rank), "").strip()
             full_name_lower = full_name.lower()
 
-            # Trouver la classe
             found_class = None
             found_spec = None
             for class_key in sorted(CLASS_MAP.keys(), key=len, reverse=True):
